@@ -20,7 +20,7 @@ Why it matters: people need to fund a new wallet without linking it to their mai
 4. **Claim**: after at least **K = 10** later notes of the same size exist, the holder of the secret asks for payout to a fresh wallet. The relayer submits it, so the fresh wallet needs no gas. The app pays out amount minus the 0.30% fee.
 5. **Refund** (safety exit): the original depositor can take back an unclaimed note, no fee. A refunded note stops counting as crowd.
 
-The rules for steps 1 to 5 already exist in `core/core.go` with 8 passing tests.
+The rules for steps 1 to 5 already exist in `core/core.go` with 15 passing tests.
 
 ## 3. Architecture
 
@@ -116,6 +116,8 @@ Security rules for the frontend: secret generated with `crypto.getRandomValues`,
 6. Compliance: PureFi screening at deposit (stub on testnet), refund-only for flagged deposits, auditor-only report via AuthorityRegistry, geoblocking, invite-only cohorts of 25 users a week with deposit caps.
 7. Funding: Horizen Ecosystem Fund Season 2, wildcard / New project path, **$25,000 ask** (dev $9,000, audit $12,000 placeholder, ops $4,000, growth $0).
 8. Application draft lives in the Claude Docs artifact: https://claude.ai/artifact/Lyfii4UWeFUeE8LrqSYdN6
+9. Minimum wait before claim: **24 hours** (decided 2026-09-30). Gives late sanctions flags (e.g. a hack) time to land before a claim, and blocks deposit-then-withdraw-at-once timing. The web app nudges users to wait a random extra time, so "exactly 24 hours later" does not become a pattern.
+10. Lock limit per wallet during invite-only: **1,000 USDC total** (decided 2026-09-30). One 1,000 note or ten 100 notes. Caps loss at about 25,000 USDC per weekly cohort if the young platform breaks. Raise after the audit and a few clean weeks.
 
 ## 10. Milestones
 
@@ -134,8 +136,8 @@ Typical payout: 10% at approval, 20% at M1, rest across M2 and M3.
 Order changed 2026-09-30: Vela access comes after the grant, so `web/` is built first against a placeholder Vela.
 
 1. Install Go 1.24+. `go test ./... -v` (expect 8 passing).
-2. Finish `core/`: fix the "need X more" error message, handle leftover credit that isn't a note size, let the depositor wallet refund without the secret (section 6), keep a running count per size instead of scanning every note, minimum wait before claim (section 12), compliance rules from decision 6 (flagged = refund-only, deposit caps, invite list). Tests for each.
-3. Build `web/` against a placeholder Vela: one file mimics Vela with the same rules, everything else talks only to that file. Wallet connection and secret generation are real. All five screens from section 6, plus the warnings from section 12. Clearly labelled demo.
+2. Finish `core/` (**done 2026-09-30, 15 tests**): fixed the "need X more" error message, leftover credit goes back to its wallet, the depositor wallet can refund without the secret (section 6), minimum wait before claim (section 12), compliance rules from decision 6 (flagged = refund-only, per-wallet lock cap, invite list). The "running count per size" change was skipped: loading the whole encrypted state each request costs more than counting notes, so it is revisited once Vela can be measured.
+3. Build `web/` against a placeholder Vela: one file mimics Vela with the same rules, everything else talks only to that file. Wallet connection and secret generation are real. All five screens from section 6, plus the warnings from section 12, plus a nudge to claim at a random time after the 24-hour wait. Clearly labelled demo.
 4. After Vela access: clone `github.com/HorizenOfficial/vela-starterkit`. Read its `CLAUDE.md` and `docs/2_private-transfer-app.md`. Run `cd dockerfiles && cp .env.dev .env && docker compose up`.
 5. Read `github.com/HorizenOfficial/vela-nova` (reference app). Copy its `main.go` bridge pattern.
 6. Create `enclave/` with the four exports. Swap `Money(uint64)` for `types.Uint256` **at the bridge only**, keep `core` simple.
