@@ -2,12 +2,13 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useConnection, useDisconnect } from 'wagmi'
 import { isAddress } from 'viem'
-import { CheckIcon, InfoIcon, WarningIcon } from '@phosphor-icons/react'
+import { CheckIcon, WarningIcon } from '@phosphor-icons/react'
 import { NoteStatusCard, effectiveState } from '../components/NoteStatusCard'
 import { SecretInput } from '../components/SecretInput'
 import { formatDuration, shortAddress } from '../lib/format'
 import { formatUsdc, type Money } from '../lib/money'
 import { cleanSecret, fingerprint } from '../lib/secret'
+import { browserRemembersWallet, forgetWallets } from '../lib/walletMemory'
 import { href } from '../router'
 import { vela } from '../vela'
 import { useVelaNow } from '../vela/hooks'
@@ -51,7 +52,7 @@ function ClaimedView({ result, onAgain }: { result: Claimed; onAgain: () => void
       </section>
       <div className="callout callout-ok" role="status">
         <CheckIcon size={18} aria-hidden="true" />
-        <p>This secret is now used up. You can delete your saved copy.</p>
+        <p>This secret is now used up. Delete your saved copy and clear it from your clipboard history.</p>
       </div>
       <p className="next-link">
         <a href={href('status')} onClick={onAgain}>
@@ -71,6 +72,14 @@ export function Claim() {
   const [fp, setFp] = useState<string | null>(null)
   const [touched, setTouched] = useState(false)
   const [result, setResult] = useState<Claimed | null>(null)
+  const [remembers, setRemembers] = useState(browserRemembersWallet)
+
+  useEffect(() => setRemembers(browserRemembersWallet()), [connected])
+
+  function forget() {
+    forgetWallets()
+    setRemembers(false)
+  }
 
   const secret = cleanSecret(secretText)
 
@@ -168,23 +177,50 @@ export function Claim() {
           <WarningIcon size={18} aria-hidden="true" />
           <div>
             <p>
-              A wallet is connected. If it's the one you deposited from, disconnect it before you claim, or the two can
-              be linked.
+              A wallet is connected in this browser. If it's the one you deposited from, the two can be linked.
+              Disconnect it and clear what this browser remembers before you claim.
             </p>
-            <button type="button" className="btn btn-sm" onClick={() => disconnect.mutate()}>
-              Disconnect wallet
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => disconnect.mutate(undefined, { onSettled: forget })}
+            >
+              Disconnect and forget
             </button>
           </div>
         </div>
       ) : (
-        <div className="callout" role="note">
-          <InfoIcon size={18} aria-hidden="true" />
-          <p>
-            Don't connect the wallet you deposited from. You don't need a wallet here at all: the relayer pays the gas,
-            so the fresh wallet can be completely empty.
-          </p>
-        </div>
+        remembers && (
+          <div className="callout callout-warn" role="alert">
+            <WarningIcon size={18} aria-hidden="true" />
+            <div>
+              <p>
+                This browser has connected a wallet to UnlinkPay before and still remembers it. For the best privacy,
+                claim from a different browser or a private window, or clear what this browser remembers.
+              </p>
+              <button type="button" className="btn btn-sm" onClick={forget}>
+                Forget wallets in this browser
+              </button>
+            </div>
+          </div>
+        )
       )}
+
+      <section className="panel">
+        <h2 className="panel-title">Before you claim</h2>
+        <ul className="plain-list">
+          <li>
+            You don't need a wallet here: the relayer pays the gas, so the fresh wallet can be completely empty. Never
+            connect the wallet you deposited from.
+          </li>
+          <li>Use a different browser, or a private window, from the one you deposited in.</li>
+          <li>
+            Use a VPN or Tor, or at least a different network from when you deposited. The relayer sees the internet
+            address your claim comes from.
+          </li>
+          <li>Claim at a random time, not the moment your note unlocks.</li>
+        </ul>
+      </section>
 
       <form className="panel form" onSubmit={submit} noValidate>
         <SecretInput id="claim-secret" value={secretText} onChange={setSecretText} error={secretError} />

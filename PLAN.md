@@ -187,10 +187,9 @@ Order: (1) apply the Claude Design look, (2) Claim-page privacy fixes, (3) legal
 - Waiting on Vela after a transaction: a "processing" state, timeout and retry.
 
 **Privacy leaks in the site itself**
-- wagmi remembers the last connected wallet in browser storage, so claiming in the same browser can tie the two wallets together. Tell users to claim from a different browser or a private window, and consider clearing that storage.
-- The relayer sees the claimer's IP address: recommend a VPN, Tor, or at least a different network.
-- The secret stays in clipboard history after Copy: warn to clear it.
-- Relayer: show its fee, whether it is online, and what to do if it is down.
+- (Done 2026-09-30) wagmi remembers the last connected wallet (address included) in browser storage. Claim now warns when a wallet is connected or remembered, offers "Disconnect and forget" / "Forget wallets in this browser" (`web/src/lib/walletMemory.ts`), and lists "Before you claim" steps: no wallet needed, different browser or private window, VPN or Tor or another network, random time.
+- (Done 2026-09-30) Clipboard: Deposit warns after Copy; the claim success screen says to clear it.
+- Relayer: show its fee, whether it is online, and what to do if it is down. Waits for the real relayer.
 
 **Compliance and legal (decision 6)**
 - Invite code or waitlist for the invite-only pilot.

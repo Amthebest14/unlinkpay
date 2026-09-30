@@ -265,6 +265,11 @@ export function Deposit() {
               {copyError && (
                 <p className="field-error">Copy didn't work here. Download the file, or select the secret and copy it.</p>
               )}
+              {copied && (
+                <p className="field-help">
+                  Copied. Clipboard history can keep it, so clear it once the secret is saved somewhere safe.
+                </p>
+              )}
               <label className={hasSaved ? 'check' : 'check is-disabled'}>
                 <input
                   type="checkbox"
