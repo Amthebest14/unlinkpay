@@ -3,8 +3,10 @@ import { LogoMark } from './components/LogoMark'
 import { WalletButton } from './components/WalletButton'
 import { Claim } from './pages/Claim'
 import { Deposit } from './pages/Deposit'
+import { Faq } from './pages/Faq'
 import { Home } from './pages/Home'
 import { Refund } from './pages/Refund'
+import { Risks } from './pages/Risks'
 import { Stats } from './pages/Stats'
 import { Status } from './pages/Status'
 import { href, useRoute, type Route } from './router'
@@ -25,6 +27,8 @@ const PAGES: Record<Route, () => React.JSX.Element> = {
   claim: Claim,
   refund: Refund,
   stats: Stats,
+  faq: Faq,
+  risks: Risks,
 }
 
 export function App() {
@@ -59,8 +63,14 @@ export function App() {
       </main>
       <footer className="footer">
         <div className="footer-inner">
-          <p>UnlinkPay runs on Horizen Vela. Privacy comes from a sealed computer, not from cryptography alone.</p>
-          <p>Not financial advice. Check the rules where you live before you deposit.</p>
+          <div className="footer-text">
+            <p>UnlinkPay runs on Horizen Vela. Privacy comes from a sealed computer, not from cryptography alone.</p>
+            <p>UnlinkPay will never ask for your secret. Not financial advice.</p>
+          </div>
+          <nav className="footer-links" aria-label="More">
+            <a href={href('faq')}>Questions</a>
+            <a href={href('risks')}>Risk notice</a>
+          </nav>
         </div>
       </footer>
       {IS_DEMO && <DemoPanel />}

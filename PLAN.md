@@ -181,7 +181,7 @@ Order: (1) apply the Claude Design look, (2) Claim-page privacy fixes, (3) legal
 
 **Wallets and transactions**
 - Reown (WalletConnect) for mobile and QR wallets. Needs a Reown project ID and routes through Reown's relay servers, which breaks the "no third-party requests" promise: decide between accepting it (and changing the home page copy) or offering it only when the user picks it.
-- Wrong network: detect it and prompt a switch to Base Sepolia (Base later).
+- (Done 2026-09-30) Wrong network: `web/src/components/NetworkCheck.tsx` warns on Deposit and Refund and offers a switch to Base Sepolia; Deposit and lock is disabled until it matches. Not yet tried with a real browser wallet (the demo wallet is always on Base Sepolia).
 - Real USDC: balance, approve plus deposit transactions, allowance, gas estimate, "not enough USDC" and "not enough ETH for gas".
 - Transaction states: waiting for wallet, pending, confirmed, failed or rejected, block explorer link.
 - Waiting on Vela after a transaction: a "processing" state, timeout and retry.
@@ -194,13 +194,14 @@ Order: (1) apply the Claude Design look, (2) Claim-page privacy fixes, (3) legal
 **Compliance and legal (decision 6)**
 - Invite code or waitlist for the invite-only pilot.
 - Geoblocking: needs a server-side check, which pulls against privacy. Decide how.
-- Terms of use and a risk notice accepted before the first deposit; privacy policy.
+- (Done 2026-09-30) Plain-language risk notice (`#/risks`), ticked before "Create my secret" on Deposit. Still needed: real terms of use and a privacy policy written with a lawyer.
 
 **Missing pages**
-- FAQ, a security page explaining the sealed-computer trust model and audits, a service-status page (Vela and relayer), a 404 page, and a "we never ask for your secret" anti-phishing note.
+- (Done 2026-09-30) Questions page (`#/faq`) with the trust model and the "UnlinkPay will never ask for your secret" note (also in the footer).
+- Still missing: a service-status page (Vela and relayer) and a 404 page (hash routes fall back to home for now).
 
 **Security and hosting**
-- Content Security Policy headers, hosting choice, unlinkpay.xyz DNS and HTTPS.
+- (Done 2026-09-30) Vercel, project "unlinkpay", config in `vercel.json` at the repo root (builds `web/`, strict CSP allowing only this site, no-referrer, HSTS, www redirects to the apex). Code on GitHub as a private repo.
 - Automated browser tests (Playwright) for the full flow.
 
 **Brand and polish**

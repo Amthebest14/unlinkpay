@@ -107,9 +107,14 @@ export function Home() {
             you're comfortable leaving in a new system.
           </p>
         </div>
-        <a className="btn btn-primary btn-lg" href={href('deposit')}>
-          Start a deposit
-        </a>
+        <div className="actions">
+          <a className="btn btn-primary btn-lg" href={href('deposit')}>
+            Start a deposit
+          </a>
+          <a className="btn btn-lg" href={href('risks')}>
+            Read the risk notice
+          </a>
+        </div>
       </section>
     </>
   )

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useConnection } from 'wagmi'
 import { CheckIcon, CopyIcon, DownloadSimpleIcon, LockSimpleIcon, WarningIcon } from '@phosphor-icons/react'
+import { NetworkCheck, TARGET_CHAIN, useWrongNetwork } from '../components/NetworkCheck'
 import { NoteStatusCard } from '../components/NoteStatusCard'
 import { SecretTicket } from '../components/SecretTicket'
 import { WalletButton } from '../components/WalletButton'
@@ -14,6 +15,25 @@ import { errorText, feeFor } from '../vela/types'
 
 type StepState = 'done' | 'current' | 'upcoming'
 type Phase = 'idle' | 'approving' | 'locking'
+
+const RISK_KEY = 'unlinkpay-risk-ok'
+
+function readRiskOk(): boolean {
+  try {
+    return localStorage.getItem(RISK_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function saveRiskOk(ok: boolean) {
+  try {
+    if (ok) localStorage.setItem(RISK_KEY, '1')
+    else localStorage.removeItem(RISK_KEY)
+  } catch {
+    // Storage blocked: the tick lasts for this visit only.
+  }
+}
 
 function Step({
   n,
@@ -89,6 +109,8 @@ export function Deposit() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [locked, setLocked] = useState<{ denom: Money; fp: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [riskOk, setRiskOk] = useState(readRiskOk)
+  const wrongNetwork = useWrongNetwork()
 
   const lockedTotal = useQuery({
     queryKey: ['vela', 'lockedTotal', address ?? ''],
@@ -192,6 +214,8 @@ export function Deposit() {
         <p className="lead">Lock a fixed amount under a secret only you hold. Later, a fresh wallet claims it with that secret.</p>
       </header>
 
+      <NetworkCheck />
+
       <ol className="steps">
         <Step n={1} title="Connect the wallet you're paying from" state={s1} summary="Wallet connected.">
           <p>This is your known wallet. The money leaves from here.</p>
@@ -236,9 +260,38 @@ export function Deposit() {
             The size can't be changed once your secret exists.
           </p>
           {denom ? (
-            <button type="button" className="btn btn-primary" onClick={() => setSecret(makeSecret())}>
-              Create my secret
-            </button>
+            <>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  value="risk"
+                  checked={riskOk}
+                  onChange={(e) => {
+                    setRiskOk(e.target.checked)
+                    saveRiskOk(e.target.checked)
+                  }}
+                />
+                <span>
+                  I've read the <a href={href('risks')}>risk notice</a>
+                </span>
+              </label>
+              <div className="submit-row">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={!riskOk}
+                  aria-describedby={riskOk ? undefined : 'dep-risk-why'}
+                  onClick={() => setSecret(makeSecret())}
+                >
+                  Create my secret
+                </button>
+                {!riskOk && (
+                  <p id="dep-risk-why" className="field-help">
+                    Read the risk notice and tick the box first.
+                  </p>
+                )}
+              </div>
+            </>
           ) : (
             <p className="field-error">This wallet has reached its limit for the invite-only pilot.</p>
           )}
@@ -321,10 +374,23 @@ export function Deposit() {
                 </li>
               </ul>
               {!busy && (
-                <button type="button" className="btn btn-primary" onClick={depositAndLock}>
-                  <LockSimpleIcon size={16} aria-hidden="true" />
-                  Deposit and lock {formatUsdc(denom)} USDC
-                </button>
+                <div className="submit-row">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={wrongNetwork}
+                    aria-describedby={wrongNetwork ? 'dep-network-why' : undefined}
+                    onClick={depositAndLock}
+                  >
+                    <LockSimpleIcon size={16} aria-hidden="true" />
+                    Deposit and lock {formatUsdc(denom)} USDC
+                  </button>
+                  {wrongNetwork && (
+                    <p id="dep-network-why" className="field-help">
+                      Switch your wallet to {TARGET_CHAIN.name} first.
+                    </p>
+                  )}
+                </div>
               )}
               {error && (
                 <p className="field-error" role="alert">

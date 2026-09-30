@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
-export type Route = 'home' | 'deposit' | 'status' | 'claim' | 'refund' | 'stats'
+export type Route = 'home' | 'deposit' | 'status' | 'claim' | 'refund' | 'stats' | 'faq' | 'risks'
 
-const PAGES: Route[] = ['deposit', 'status', 'claim', 'refund', 'stats']
+const PAGES: Route[] = ['deposit', 'status', 'claim', 'refund', 'stats', 'faq', 'risks']
 
 function readRoute(): Route {
   const name = window.location.hash.replace(/^#\/?/, '')

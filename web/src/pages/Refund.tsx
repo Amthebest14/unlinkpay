@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useConnection } from 'wagmi'
 import { CheckIcon } from '@phosphor-icons/react'
+import { NetworkCheck } from '../components/NetworkCheck'
 import { effectiveState } from '../components/NoteStatusCard'
 import { WalletButton } from '../components/WalletButton'
 import { formatDay, shortAddress } from '../lib/format'
@@ -91,6 +92,7 @@ export function Refund() {
         </section>
       ) : (
         <>
+          <NetworkCheck />
           <section className="panel">
             <h2 className="panel-title">Waiting notes</h2>
             {notes.isLoading && <div className="skeleton-line" aria-busy="true" aria-label="Loading notes" />}
