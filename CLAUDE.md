@@ -10,7 +10,8 @@ Private wallet funding on Horizen Vela (TEE app, WASM built with TinyGo). User d
 - Principle: money can always go back to the wallet it came from; rules only limit locking and claiming.
 - `web/`: Vite 8 + React 19 + TS 7 + wagmi 3 (hooks: `useConnection`, `useConnect().mutate`, `useConnectors`; no `useAccount`). Pages: home, deposit, status, claim, refund, stats. Placeholder Vela in `web/src/vela/placeholder.ts` mirrors `core/` (9 vitest tests); `web/src/vela/index.ts` is the only file that picks which Vela is used. Run: `npm --prefix web run dev` (port 5173), `npm --prefix web test`, `npm --prefix web run build`.
 - Look: all tokens in `web/src/styles.css` (calm statement: off-white, ink, one deep green, Geist + Geist Mono self-hosted). Taste skill installed in `.claude/skills/design-taste-frontend` (applies to the landing page only).
-- Privacy rule for the site: no third-party requests (no CDNs, remote fonts, remote images, analytics). The home page promises this, so the real RPC must be self-hosted or proxied, or the copy changed.
+- Privacy rule for the site: no third-party requests (no CDNs, remote fonts, remote images, analytics). The home page promises this, so the real RPC must be self-hosted or proxied, or the copy changed. `vercel.json` enforces it with a CSP of `'self'` only: adding any outside origin needs a deliberate CSP change.
+- Hosting: GitHub private repo Amthebest14/unlinkpay (branch main), connected to Vercel project "unlinkpay", so every push to main deploys. Live at https://unlinkpay.vercel.app and https://unlinkpay.xyz (domain bought through Vercel; www redirects to the apex). Manual deploy: `vercel deploy --prod` from the repo root. Preview deployments are behind Vercel login by default.
 
 ## Next (in order)
 Vela access comes after the grant, so the web app is built first against a placeholder Vela. Full order in PLAN.md section 11.
