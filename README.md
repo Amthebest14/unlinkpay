@@ -6,7 +6,7 @@ Website (planned): unlinkpay.xyz
 
 ## Status
 - `core/` — the rules (deposit, lock, claim after a crowd of K later deposits, refund, fee). Pure Go, fully tested. **Done (slice 1).**
-- `web/` — the deposit/claim screens and the public stats page, first against a placeholder Vela. *Next.*
+- `web/` — home, deposit, status, claim, refund and stats pages, running against a placeholder Vela in the browser. **Demo working.** Run it with `npm --prefix web install` once, then `npm --prefix web run dev` and open http://localhost:5173.
 - `enclave/` — thin bridge that plugs `core` into Vela's WASM exports. *After Vela access.*
 - `relayer/` — sends the claim so the fresh wallet needs no gas. *After Vela access.*
 
