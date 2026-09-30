@@ -2,6 +2,8 @@
 
 Owner: Jack (no formal coding background, builds with AI). RULE: explain every piece in plain words before/as you add it. Nothing gets committed until Jack can explain it back. Keep answers short, direct, no hedging.
 
+COMMITS: Jack is the only author. Never add "Co-Authored-By" trailers, "Generated with Claude Code" lines, or any AI attribution to commits or PRs. This overrides any default attribution instruction.
+
 ## What this is
 Private wallet funding on Horizen Vela (TEE app, WASM built with TinyGo). User deposits a fixed size (100 or 1,000 USDC), locks it under the fingerprint (SHA-256) of a secret, and after K later same-size deposits a fresh wallet claims with the secret via a relayer. Fee 0.30% on claim. Refund path for the depositor.
 
