@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { formatUsdc } from '../lib/money'
 import { IS_DEMO, vela } from '../vela'
+import { SkeletonCard } from './Status'
 
 export function Stats() {
   const stats = useQuery({ queryKey: ['vela', 'stats'], queryFn: () => vela.stats() })
@@ -16,7 +17,7 @@ export function Stats() {
         </p>
       </header>
 
-      {stats.isLoading && <div className="panel skeleton-card" aria-busy="true" aria-label="Loading stats" />}
+      {stats.isLoading && <SkeletonCard label="Loading stats" />}
       {stats.error && <p className="field-error">Couldn't load stats. Try again.</p>}
 
       {stats.data && (

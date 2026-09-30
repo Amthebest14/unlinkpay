@@ -7,7 +7,10 @@ import '@fontsource-variable/geist-mono/index.css'
 import './styles.css'
 import { wagmiConfig } from './wagmi'
 import { vela } from './vela'
+import { applyTheme, savedTheme } from './lib/theme'
 import { App } from './App'
+
+applyTheme(savedTheme())
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 

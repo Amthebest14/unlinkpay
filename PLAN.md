@@ -174,3 +174,37 @@ Order changed 2026-09-30: Vela access comes after the grant, so `web/` is built 
 - Shared Go types: https://github.com/HorizenOfficial/vela-common-go
 - TS client: https://github.com/HorizenOfficial/vela-common-ts
 - Builder fund: https://horizen.io/builder-fund/
+
+## 15. Frontend: not handled yet (listed 2026-09-30)
+
+Order: (1) apply the Claude Design look, (2) Claim-page privacy fixes, (3) legal pages and FAQ, (4) wrong-network check. Reown and real transactions wait for Vela access.
+
+**Wallets and transactions**
+- Reown (WalletConnect) for mobile and QR wallets. Needs a Reown project ID and routes through Reown's relay servers, which breaks the "no third-party requests" promise: decide between accepting it (and changing the home page copy) or offering it only when the user picks it.
+- Wrong network: detect it and prompt a switch to Base Sepolia (Base later).
+- Real USDC: balance, approve plus deposit transactions, allowance, gas estimate, "not enough USDC" and "not enough ETH for gas".
+- Transaction states: waiting for wallet, pending, confirmed, failed or rejected, block explorer link.
+- Waiting on Vela after a transaction: a "processing" state, timeout and retry.
+
+**Privacy leaks in the site itself**
+- wagmi remembers the last connected wallet in browser storage, so claiming in the same browser can tie the two wallets together. Tell users to claim from a different browser or a private window, and consider clearing that storage.
+- The relayer sees the claimer's IP address: recommend a VPN, Tor, or at least a different network.
+- The secret stays in clipboard history after Copy: warn to clear it.
+- Relayer: show its fee, whether it is online, and what to do if it is down.
+
+**Compliance and legal (decision 6)**
+- Invite code or waitlist for the invite-only pilot.
+- Geoblocking: needs a server-side check, which pulls against privacy. Decide how.
+- Terms of use and a risk notice accepted before the first deposit; privacy policy.
+
+**Missing pages**
+- FAQ, a security page explaining the sealed-computer trust model and audits, a service-status page (Vela and relayer), a 404 page, and a "we never ask for your secret" anti-phishing note.
+
+**Security and hosting**
+- Content Security Policy headers, hosting choice, unlinkpay.xyz DNS and HTTPS.
+- Automated browser tests (Playwright) for the full flow.
+
+**Brand and polish**
+- Logo (made in Nano Banana, to be traced to SVG), favicon, link-preview image.
+- Stats from the subgraph instead of demo numbers.
+- Keyboard and screen reader check of every screen.

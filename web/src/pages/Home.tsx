@@ -1,3 +1,4 @@
+import { LogoMark } from '../components/LogoMark'
 import { SecretTicket } from '../components/SecretTicket'
 import { USDC } from '../lib/money'
 import { href } from '../router'
@@ -9,6 +10,7 @@ export function Home() {
     <>
       <section className="hero">
         <div className="hero-copy">
+          <LogoMark height={40} title="UnlinkPay" className="hero-mark" />
           <h1>Fund a fresh wallet. Leave no link.</h1>
           <p className="lead">
             Deposit from the wallet people know. Claim later from a brand-new one. Nobody watching can match the two.

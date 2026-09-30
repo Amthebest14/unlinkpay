@@ -2,35 +2,43 @@ import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useConnection } from 'wagmi'
 import { CheckIcon } from '@phosphor-icons/react'
+import { effectiveState } from '../components/NoteStatusCard'
 import { WalletButton } from '../components/WalletButton'
-import { shortAddress } from '../lib/format'
+import { formatDay, shortAddress } from '../lib/format'
 import { formatUsdc } from '../lib/money'
-import { href } from '../router'
 import { vela } from '../vela'
+import { useVelaNow } from '../vela/hooks'
 import { errorText, type NoteInfo, type Payout } from '../vela/types'
 
 function NoteRow({ note, wallet, onDone }: { note: NoteInfo; wallet: string; onDone: (p: Payout) => void }) {
+  const now = useVelaNow()
   const [confirming, setConfirming] = useState(false)
   const status = useQuery({
     queryKey: ['vela', 'status', note.fingerprint],
     queryFn: () => vela.statusOf(note.fingerprint),
   })
   const refund = useMutation({ mutationFn: () => vela.refund(wallet, note.fingerprint), onSuccess: onDone })
+  const amount = `${formatUsdc(note.denom)} USDC`
+  const s = status.data
+  const progress = s
+    ? effectiveState(s, now) === 'ready'
+      ? 'Ready to claim.'
+      : `${Math.min(s.crowd, s.need)} of ${s.need} later deposits.`
+    : ''
 
   return (
     <li className="note-row">
       <div className="note-info">
-        <p className="note-amount">{formatUsdc(note.denom)} USDC</p>
+        <p className="note-amount">{amount}</p>
         <p className="note-meta">
-          Note {note.seq} of this size
-          {status.data && `. ${status.data.crowd} of ${status.data.need} later deposits so far`}
+          Deposited {formatDay(note.lockedAt)}. {progress}
         </p>
       </div>
       {confirming ? (
-        <div className="note-confirm">
+        <div className="note-confirm" role="group" aria-label="Confirm refund">
           <p>
-            Refund {formatUsdc(note.denom)} USDC to {shortAddress(wallet)}? Refunds are public, so this note stops hiding
-            anyone.
+            Refund {amount} to <span className="mono">{shortAddress(wallet)}</span>, with no fee? Refunds are public, so
+            this note stops hiding anyone.
           </p>
           <div className="actions">
             <button type="button" className="btn btn-primary btn-sm" disabled={refund.isPending} onClick={() => refund.mutate()}>
@@ -83,22 +91,13 @@ export function Refund() {
         </section>
       ) : (
         <>
-          {done && (
-            <div className="callout callout-ok" role="status">
-              <CheckIcon size={18} aria-hidden="true" />
-              <p>
-                {formatUsdc(done.amount)} USDC sent back to {shortAddress(done.to)}. Demo only: no real money moved.
-              </p>
-            </div>
-          )}
-
           <section className="panel">
-            <h2 className="panel-title">Waiting notes from {shortAddress(address)}</h2>
+            <h2 className="panel-title">Waiting notes</h2>
             {notes.isLoading && <div className="skeleton-line" aria-busy="true" aria-label="Loading notes" />}
             {notes.data && notes.data.length === 0 && (
               <div className="empty">
                 <p>This wallet has no waiting notes.</p>
-                <a className="btn btn-sm" href={href('deposit')}>
+                <a className="btn btn-sm" href="#/deposit">
                   Start a deposit
                 </a>
               </div>
@@ -112,18 +111,39 @@ export function Refund() {
             )}
           </section>
 
-          {credit.data !== undefined && credit.data > 0n && (
-            <section className="panel">
-              <h2 className="panel-title">Unlocked credit</h2>
+          <section className="panel">
+            <h2 className="panel-title">Unlocked credit</h2>
+            <p>
+              Money you deposited but never locked into a note waits here until you withdraw it to{' '}
+              <span className="mono">{shortAddress(address)}</span>.
+            </p>
+            <div className="credit-row">
+              <span className="credit-amount">{formatUsdc(credit.data ?? 0n)} USDC</span>
+              {credit.data !== undefined && credit.data > 0n ? (
+                <button type="button" className="btn" disabled={withdraw.isPending} onClick={() => withdraw.mutate()}>
+                  {withdraw.isPending ? 'Withdrawing…' : 'Withdraw'}
+                </button>
+              ) : (
+                <div className="submit-row">
+                  <button type="button" className="btn" disabled aria-describedby="credit-why">
+                    Withdraw
+                  </button>
+                  <p id="credit-why" className="field-help">
+                    Nothing to withdraw yet.
+                  </p>
+                </div>
+              )}
+            </div>
+            {withdraw.error && <p className="field-error">{errorText(withdraw.error)}</p>}
+          </section>
+
+          {done && (
+            <div className="callout callout-ok" role="status">
+              <CheckIcon size={18} aria-hidden="true" />
               <p>
-                {formatUsdc(credit.data)} USDC was deposited from this wallet but never locked into a note. It can only go
-                back to this wallet.
+                {formatUsdc(done.amount)} USDC sent to <span className="mono">{shortAddress(done.to)}</span>.
               </p>
-              <button type="button" className="btn" disabled={withdraw.isPending} onClick={() => withdraw.mutate()}>
-                {withdraw.isPending ? 'Withdrawing…' : `Withdraw ${formatUsdc(credit.data)} USDC`}
-              </button>
-              {withdraw.error && <p className="field-error">{errorText(withdraw.error)}</p>}
-            </section>
+            </div>
           )}
         </>
       )}

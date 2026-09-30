@@ -13,6 +13,7 @@ export interface NoteInfo {
   fingerprint: string
   denom: Money
   seq: number
+  lockedAt: number // unix seconds
 }
 
 export type NoteState = 'waiting' | 'ready' | 'claimed' | 'refunded' | 'refund-only'

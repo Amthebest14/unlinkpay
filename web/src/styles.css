@@ -3,16 +3,17 @@
    Corners: controls 8px, cards 12px. One accent: deep green. */
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   --bg: #f3f3f0;
   --surface: #fbfbf9;
   --surface-sunk: #e9e9e4;
   --ink: #16181a;
   --ink-2: #474a4e;
-  --ink-3: #676a6f;
+  --ink-3: #62656a;
   --line: #dcdcd5;
   --line-strong: #b4b4ab;
+  --control-line: #808387;
   --accent: #0e6b52;
   --accent-hover: #0b5944;
   --on-accent: #f1faf6;
@@ -38,8 +39,10 @@
   --z-menu: 30;
 }
 
+/* Dark follows the device unless the theme switch pinned light or dark on <html data-theme>. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
     --bg: #121314;
     --surface: #1a1b1d;
     --surface-sunk: #0d0e0f;
@@ -48,6 +51,7 @@
     --ink-3: #939693;
     --line: #2a2c2e;
     --line-strong: #45484b;
+    --control-line: #6b6f73;
     --accent: #4fc39c;
     --accent-hover: #6bd1ae;
     --on-accent: #06281e;
@@ -59,6 +63,29 @@
     --danger: #f09595;
     --shadow-float: 0 8px 24px rgb(0 0 0 / 0.45);
   }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #121314;
+  --surface: #1a1b1d;
+  --surface-sunk: #0d0e0f;
+  --ink: #ececea;
+  --ink-2: #b9bbb8;
+  --ink-3: #939693;
+  --line: #2a2c2e;
+  --line-strong: #45484b;
+  --control-line: #6b6f73;
+  --accent: #4fc39c;
+  --accent-hover: #6bd1ae;
+  --on-accent: #06281e;
+  --accent-soft: #12302a;
+  --accent-ink: #8fe0c3;
+  --warn-soft: #2e2410;
+  --warn-ink: #f2cc80;
+  --warn-line: #5a4617;
+  --danger: #f09595;
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 0.45);
 }
 
 *,
@@ -148,7 +175,20 @@ a:hover {
   gap: 28px;
 }
 
+.logo-mark {
+  display: block;
+  flex: none;
+  color: var(--accent);
+}
+
+.hero-mark {
+  margin-bottom: 28px;
+}
+
 .wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--ink);
   font-weight: 650;
   font-size: 17px;
@@ -216,7 +256,7 @@ a:hover {
   gap: 8px;
   height: 40px;
   padding: 0 16px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-line);
   border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--ink);
@@ -719,7 +759,7 @@ a:hover {
   width: 100%;
   height: 44px;
   padding: 0 12px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-line);
   border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--ink);
@@ -918,7 +958,7 @@ a:hover {
   display: grid;
   gap: 4px;
   padding: 16px 18px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-line);
   border-radius: var(--radius-card);
   background: var(--surface);
   cursor: pointer;
@@ -1091,7 +1131,7 @@ a:hover {
   width: 14px;
   height: 14px;
   border-radius: 3px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-line);
 }
 
 .tick-on {
@@ -1291,6 +1331,135 @@ a:hover {
   min-height: 36px;
   padding: 6px 10px;
   line-height: 1.3;
+}
+
+/* Step summaries, progress notes, breakdowns, credit, skeleton lines, pressed chips */
+
+.step-body .step-summary {
+  color: var(--ink-2);
+  font-size: 15px;
+}
+
+.step-body .progress {
+  width: 100%;
+}
+
+.progress-note {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+.progress li.is-active .progress-note {
+  color: var(--accent-ink);
+}
+
+.status-tip {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.status-tip p {
+  color: var(--ink-2);
+}
+
+.breakdown {
+  width: 100%;
+  display: grid;
+}
+
+.breakdown > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown > div + div {
+  border-top: 1px solid var(--line);
+}
+
+.breakdown dt {
+  color: var(--ink-2);
+}
+
+.breakdown > div:last-child dt,
+.breakdown > div:last-child dd {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.credit-row {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.credit-amount {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.skeleton-lines {
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.skeleton-lines span {
+  display: block;
+  height: 14px;
+  border-radius: var(--radius-control);
+  background: var(--surface-sunk);
+}
+
+.skeleton-lines span:nth-child(1) {
+  width: 40%;
+  height: 20px;
+}
+
+.skeleton-lines span:nth-child(2) {
+  width: 85%;
+}
+
+.skeleton-lines span:nth-child(3) {
+  width: 60%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-lines span {
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+}
+
+.btn[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.demo-section {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.demo-label {
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* Small screens */

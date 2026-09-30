@@ -31,6 +31,7 @@ interface State {
   invited: Record<string, boolean>
   flagged: Record<string, boolean>
   clockOffset: number
+  lastNote?: string // demo only: the fingerprint of the visitor's most recent note
 }
 
 export interface DemoControls {
@@ -38,6 +39,7 @@ export interface DemoControls {
   skipAhead(secs: number): void
   reset(): void
   clockOffset(): number
+  latestNote(): NoteStatus | null
 }
 
 export const DEMO_CONFIG: VelaConfig = {
@@ -168,6 +170,7 @@ export function createPlaceholderVela(opts: PlaceholderOptions): { vela: Vela; d
     async lock(wallet, denom, fp) {
       await slow()
       lockNow(wallet, denom, fp)
+      state.lastNote = fp
       commit()
     },
 
@@ -226,7 +229,7 @@ export function createPlaceholderVela(opts: PlaceholderOptions): { vela: Vela; d
       const out: NoteInfo[] = []
       for (const [fp, note] of Object.entries(state.notes)) {
         if (note.depositor === w && !note.claimed && !note.refunded) {
-          out.push({ fingerprint: fp, denom: note.denom, seq: note.seq })
+          out.push({ fingerprint: fp, denom: note.denom, seq: note.seq, lockedAt: note.lockedAt })
         }
       }
       return out.sort((a, b) => (a.denom === b.denom ? a.seq - b.seq : a.denom < b.denom ? -1 : 1))
@@ -282,6 +285,10 @@ export function createPlaceholderVela(opts: PlaceholderOptions): { vela: Vela; d
       commit()
     },
     clockOffset: () => state.clockOffset,
+    latestNote() {
+      const note = state.lastNote ? state.notes[state.lastNote] : undefined
+      return note ? statusOfNote(note) : null
+    },
   }
 
   return { vela, demo }

@@ -5,13 +5,62 @@ import { isAddress } from 'viem'
 import { CheckIcon, InfoIcon, WarningIcon } from '@phosphor-icons/react'
 import { NoteStatusCard, effectiveState } from '../components/NoteStatusCard'
 import { SecretInput } from '../components/SecretInput'
-import { shortAddress } from '../lib/format'
-import { formatUsdc } from '../lib/money'
+import { formatDuration, shortAddress } from '../lib/format'
+import { formatUsdc, type Money } from '../lib/money'
 import { cleanSecret, fingerprint } from '../lib/secret'
+import { href } from '../router'
 import { vela } from '../vela'
 import { useVelaNow } from '../vela/hooks'
-import { VelaError, errorText, feeFor, type Payout } from '../vela/types'
+import { VelaError, errorText, feeFor } from '../vela/types'
 import { BAD_SECRET, NO_MATCH } from './Status'
+
+interface Claimed {
+  denom: Money
+  fee: Money
+  amount: Money
+  to: string
+}
+
+const FEE_LABEL = `${(Number(vela.config.feeBps) / 100).toFixed(2)}%`
+
+function ClaimedView({ result, onAgain }: { result: Claimed; onAgain: () => void }) {
+  return (
+    <div className="page-narrow">
+      <header className="page-head">
+        <h1>Claimed to your fresh wallet</h1>
+        <p className="lead">
+          {formatUsdc(result.amount)} USDC is on its way to <span className="mono">{shortAddress(result.to)}</span>. The
+          relayer paid the gas.
+        </p>
+      </header>
+      <section className="panel">
+        <dl className="breakdown">
+          <div>
+            <dt>Note</dt>
+            <dd>{formatUsdc(result.denom)} USDC</dd>
+          </div>
+          <div>
+            <dt>Claim fee ({FEE_LABEL})</dt>
+            <dd>{formatUsdc(result.fee)} USDC</dd>
+          </div>
+          <div>
+            <dt>Fresh wallet receives</dt>
+            <dd>{formatUsdc(result.amount)} USDC</dd>
+          </div>
+        </dl>
+      </section>
+      <div className="callout callout-ok" role="status">
+        <CheckIcon size={18} aria-hidden="true" />
+        <p>This secret is now used up. You can delete your saved copy.</p>
+      </div>
+      <p className="next-link">
+        <a href={href('status')} onClick={onAgain}>
+          Check another note
+        </a>
+      </p>
+    </div>
+  )
+}
 
 export function Claim() {
   const { address: connected } = useConnection()
@@ -21,7 +70,7 @@ export function Claim() {
   const [to, setTo] = useState('')
   const [fp, setFp] = useState<string | null>(null)
   const [touched, setTouched] = useState(false)
-  const [result, setResult] = useState<Payout | null>(null)
+  const [result, setResult] = useState<Claimed | null>(null)
 
   const secret = cleanSecret(secretText)
 
@@ -46,7 +95,8 @@ export function Claim() {
   const claim = useMutation({
     mutationFn: () => vela.claim(secret!, to.trim()),
     onSuccess: (payout) => {
-      setResult(payout)
+      const denom = status.data?.denom ?? payout.amount
+      setResult({ denom, fee: denom - payout.amount, amount: payout.amount, to: payout.to })
       setSecretText('')
       setTo('')
       setTouched(false)
@@ -56,63 +106,55 @@ export function Claim() {
   const toClean = to.trim()
   const toValid = isAddress(toClean)
   const sameAsConnected = !!connected && toClean.toLowerCase() === connected.toLowerCase()
-  const state = status.data ? effectiveState(status.data, now) : null
+  const note = status.data
+  const state = note ? effectiveState(note, now) : null
   const notFound = status.error instanceof VelaError && status.error.code === 'unknown-note'
-  const payout = status.data ? status.data.denom - feeFor(vela.config, status.data.denom) : null
+  const fee = note ? feeFor(vela.config, note.denom) : null
+  const payout = note && fee !== null ? note.denom - fee : null
 
   const secretError = secretText.trim() && !secret ? BAD_SECRET : notFound ? NO_MATCH : null
   const toError =
     touched && toClean && !toValid
-      ? 'Enter a full wallet address that starts with 0x.'
+      ? "That isn't a complete address. It starts with 0x followed by 40 letters and numbers."
       : sameAsConnected
         ? "That's the wallet connected in this browser. Use a brand-new address instead."
         : null
 
   let blocker: string | null = null
-  if (!secret) blocker = 'Paste your secret to check whether it can be claimed.'
-  else if (status.isLoading || !status.data) blocker = notFound ? 'This secret has no note.' : 'Checking your note…'
-  else if (state === 'waiting') blocker = 'Claim unlocks after 10 later deposits and the 24-hour wait.'
-  else if (state !== 'ready') blocker = 'This note cannot be claimed.'
-  else if (!toValid) blocker = 'Add the fresh wallet address.'
-  else if (sameAsConnected) blocker = 'Use a different address from your connected wallet.'
+  if (!secretText.trim()) blocker = 'Paste your secret to check whether it can be claimed.'
+  else if (secretError) blocker = 'Fix the secret above first.'
+  else if (!note) blocker = 'Checking your note…'
+  else if (state === 'waiting') {
+    const parts: string[] = []
+    const missing = note.need - note.crowd
+    if (missing > 0) parts.push(`${missing} more later deposit${missing === 1 ? '' : 's'}`)
+    if (note.unlocksAt > now) parts.push(`${formatDuration(note.unlocksAt - now)} of waiting`)
+    blocker = `Not ready yet. It still needs ${parts.join(' and ')}.`
+  } else if (state === 'claimed') blocker = 'This note has already been claimed.'
+  else if (state === 'refunded') blocker = "This note was refunded, so it can't be claimed."
+  else if (state === 'refund-only') blocker = 'This note can only be refunded to the wallet it came from.'
+  else if (!toClean) blocker = 'Add the fresh wallet address that should receive the money.'
+  else if (!toValid || sameAsConnected) blocker = 'Fix the address above first.'
 
   function submit(e: FormEvent) {
     e.preventDefault()
     setTouched(true)
-    if (!blocker) claim.mutate()
+    if (!blocker && !claim.isPending) claim.mutate()
   }
 
   if (result) {
     return (
-      <div className="page-narrow">
-        <header className="page-head">
-          <h1>Claimed</h1>
-          <p className="lead">
-            {formatUsdc(result.amount)} USDC is on its way to <span className="mono">{shortAddress(result.to)}</span>.
-          </p>
-        </header>
-        <section className="panel">
-          <div className="callout callout-ok">
-            <CheckIcon size={18} aria-hidden="true" />
-            <p>
-              In the real app, the relayer submits this for you and pays the gas. The fresh wallet never touches your old
-              one. This demo moved no real money.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => {
-              setResult(null)
-              claim.reset()
-            }}
-          >
-            Claim another note
-          </button>
-        </section>
-      </div>
+      <ClaimedView
+        result={result}
+        onAgain={() => {
+          setResult(null)
+          claim.reset()
+        }}
+      />
     )
   }
+
+  const amountLabel = payout !== null ? `${formatUsdc(payout)} USDC` : ''
 
   return (
     <div className="page-narrow">
@@ -122,24 +164,24 @@ export function Claim() {
       </header>
 
       {connected ? (
-        <div className="callout callout-warn">
+        <div className="callout callout-warn" role="alert">
           <WarningIcon size={18} aria-hidden="true" />
           <div>
             <p>
-              A wallet is connected in this browser ({shortAddress(connected)}). For privacy, disconnect it before you
-              claim.
+              A wallet is connected. If it's the one you deposited from, disconnect it before you claim, or the two can
+              be linked.
             </p>
             <button type="button" className="btn btn-sm" onClick={() => disconnect.mutate()}>
-              Disconnect
+              Disconnect wallet
             </button>
           </div>
         </div>
       ) : (
-        <div className="callout">
+        <div className="callout" role="note">
           <InfoIcon size={18} aria-hidden="true" />
           <p>
-            You don't need to connect a wallet here. The relayer pays the gas, so the fresh wallet can be completely
-            empty.
+            Don't connect the wallet you deposited from. You don't need a wallet here at all: the relayer pays the gas,
+            so the fresh wallet can be completely empty.
           </p>
         </div>
       )}
@@ -153,18 +195,19 @@ export function Claim() {
             id="claim-to"
             className="input mono"
             type="text"
-            inputMode="text"
             autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
             spellCheck={false}
             placeholder="0x…"
             value={to}
             aria-invalid={toError ? true : undefined}
-            aria-describedby={toError ? 'claim-to-error' : 'claim-to-help'}
+            aria-describedby="claim-to-help"
             onChange={(e) => setTo(e.target.value)}
             onBlur={() => setTouched(true)}
           />
           {toError ? (
-            <p id="claim-to-error" className="field-error">
+            <p id="claim-to-help" className="field-error" role="alert">
               {toError}
             </p>
           ) : (
@@ -174,13 +217,33 @@ export function Claim() {
           )}
         </div>
 
-        {status.data && <NoteStatusCard status={status.data} now={now} />}
+        {note && <NoteStatusCard status={note} now={now} />}
 
         <div className="submit-row">
-          <button type="submit" className="btn btn-primary" disabled={!!blocker || claim.isPending}>
-            {claim.isPending ? 'Claiming…' : payout !== null ? `Claim ${formatUsdc(payout)} USDC` : 'Claim'}
-          </button>
-          {blocker && <p className="field-help">{blocker}</p>}
+          {claim.isPending ? (
+            <>
+              <button type="button" className="btn btn-primary" aria-disabled="true">
+                Claiming {amountLabel}…
+              </button>
+              <p className="field-help" aria-live="polite">
+                Sending through the relayer. Keep this page open.
+              </p>
+            </>
+          ) : (
+            <>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={!!blocker}
+                aria-describedby="claim-reason"
+              >
+                {amountLabel ? `Claim ${amountLabel}` : 'Claim'}
+              </button>
+              <p id="claim-reason" className="field-help">
+                {blocker ?? (fee !== null && `${formatUsdc(fee)} USDC fee. The relayer pays the gas.`)}
+              </p>
+            </>
+          )}
         </div>
         {claim.error && (
           <p className="field-error" role="alert">

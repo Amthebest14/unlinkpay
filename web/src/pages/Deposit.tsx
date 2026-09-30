@@ -1,20 +1,33 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useConnection } from 'wagmi'
-import { CheckIcon, CopyIcon, DownloadSimpleIcon, WarningIcon } from '@phosphor-icons/react'
+import { CheckIcon, CopyIcon, DownloadSimpleIcon, LockSimpleIcon, WarningIcon } from '@phosphor-icons/react'
+import { NoteStatusCard } from '../components/NoteStatusCard'
 import { SecretTicket } from '../components/SecretTicket'
 import { WalletButton } from '../components/WalletButton'
-import { shortAddress } from '../lib/format'
 import { formatUsdc, type Money } from '../lib/money'
 import { fingerprint, makeSecret, secretFileText } from '../lib/secret'
 import { href } from '../router'
 import { vela } from '../vela'
+import { useVelaNow } from '../vela/hooks'
 import { errorText, feeFor } from '../vela/types'
 
 type StepState = 'done' | 'current' | 'upcoming'
-type Phase = 'idle' | 'depositing' | 'locking' | 'done'
+type Phase = 'idle' | 'approving' | 'locking'
 
-function Step({ n, title, state, children }: { n: number; title: string; state: StepState; children?: ReactNode }) {
+function Step({
+  n,
+  title,
+  state,
+  summary,
+  children,
+}: {
+  n: number
+  title: string
+  state: StepState
+  summary?: ReactNode
+  children?: ReactNode
+}) {
   return (
     <li className={`step step-${state}`} aria-current={state === 'current' ? 'step' : undefined}>
       <div className="step-marker" aria-hidden="true">
@@ -22,23 +35,59 @@ function Step({ n, title, state, children }: { n: number; title: string; state: 
       </div>
       <div className="step-body">
         <h2 className="step-title">{title}</h2>
-        {state !== 'upcoming' && children}
+        {state === 'current' && children}
+        {state === 'done' && summary && <p className="step-summary">{summary}</p>}
       </div>
     </li>
+  )
+}
+
+function Locked({ denom, fp, onAgain }: { denom: Money; fp: string; onAgain: () => void }) {
+  const now = useVelaNow()
+  const cfg = vela.config
+  const status = useQuery({ queryKey: ['vela', 'status', fp], queryFn: () => vela.statusOf(fp) })
+  return (
+    <div className="page-narrow">
+      <header className="page-head">
+        <h1>Your {formatUsdc(denom)} USDC is locked</h1>
+        <p className="lead">
+          It can be claimed to a fresh wallet once {cfg.minCrowd} more {formatUsdc(denom)} USDC deposits arrive and{' '}
+          {cfg.minWaitSecs / 3600} hours pass. There's nothing else to do right now.
+        </p>
+      </header>
+      {status.data && <NoteStatusCard status={status.data} now={now} />}
+      <section className="panel">
+        <h2 className="panel-title">What happens next</h2>
+        <ol className="plain-list">
+          <li>Keep the secret file somewhere only you can reach. Nobody can recover it for you.</li>
+          <li>Check progress on the Status page whenever you like. Your note waits as long as it needs to.</li>
+          <li>When it's ready, open Claim without connecting this wallet, ideally in a different browser.</li>
+        </ol>
+        <div className="actions">
+          <a className="btn btn-primary" href={href('status')}>
+            Check status
+          </a>
+          <button type="button" className="btn" onClick={onAgain}>
+            Make another deposit
+          </button>
+        </div>
+      </section>
+    </div>
   )
 }
 
 export function Deposit() {
   const { address } = useConnection()
   const cfg = vela.config
-  const [denom, setDenom] = useState<Money | null>(null)
+  const [picked, setPicked] = useState<Money | null>(null)
   const [secret, setSecret] = useState<string | null>(null)
   const [downloaded, setDownloaded] = useState(false)
   const [copied, setCopied] = useState(false)
   const [copyError, setCopyError] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const [continued, setContinued] = useState(false)
   const [phase, setPhase] = useState<Phase>('idle')
-  const [lockedDenom, setLockedDenom] = useState<Money | null>(null)
+  const [locked, setLocked] = useState<{ denom: Money; fp: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const lockedTotal = useQuery({
@@ -48,14 +97,15 @@ export function Deposit() {
   })
 
   function reset() {
-    setDenom(null)
+    setPicked(null)
     setSecret(null)
     setDownloaded(false)
     setCopied(false)
     setCopyError(false)
     setConfirmed(false)
+    setContinued(false)
     setPhase('idle')
-    setLockedDenom(null)
+    setLocked(null)
     setError(null)
   }
 
@@ -64,10 +114,11 @@ export function Deposit() {
 
   const remaining =
     cfg.maxLockPerWallet > 0n && lockedTotal.data !== undefined ? cfg.maxLockPerWallet - lockedTotal.data : null
+  const fits = (d: Money) => remaining === null || d <= remaining
+  const denom = picked ?? cfg.denominations.find(fits) ?? null
   // A failed copy still unlocks the checkbox: the secret can be selected and copied by hand.
   const hasSaved = downloaded || copied || copyError
-  const saved = hasSaved && confirmed
-  const busy = phase === 'depositing' || phase === 'locking'
+  const busy = phase !== 'idle'
 
   function download() {
     if (!secret || !denom) return
@@ -95,60 +146,44 @@ export function Deposit() {
   async function depositAndLock() {
     if (!address || !denom || !secret) return
     setError(null)
-    let stage: Phase = 'depositing'
+    let stage: Phase = 'approving'
     try {
       setPhase(stage)
       // If an earlier try deposited but failed to lock, reuse that credit.
       if ((await vela.creditOf(address)) < denom) await vela.deposit(address, denom)
       stage = 'locking'
       setPhase(stage)
-      await vela.lock(address, denom, await fingerprint(secret))
-      setLockedDenom(denom)
+      const fp = await fingerprint(secret)
+      await vela.lock(address, denom, fp)
       setSecret(null)
-      setPhase('done')
+      setLocked({ denom, fp })
     } catch (e) {
-      setPhase('idle')
       setError(
         stage === 'locking'
           ? `${errorText(e)} Your deposit is kept as credit. You can withdraw it on the Refund page.`
           : errorText(e),
       )
+    } finally {
+      setPhase('idle')
     }
   }
 
-  if (phase === 'done' && lockedDenom) {
-    return (
-      <div className="page-narrow">
-        <header className="page-head">
-          <h1>Your {formatUsdc(lockedDenom)} USDC is locked</h1>
-          <p className="lead">
-            It now waits for 10 later deposits of the same size and 24 hours. After that, whoever holds your secret can
-            claim it.
-          </p>
-        </header>
-        <section className="panel">
-          <h2 className="panel-title">What to do next</h2>
-          <ul className="plain-list">
-            <li>Keep your secret file somewhere safe and private.</li>
-            <li>
-              Check progress anytime on the <a href={href('status')}>Status</a> page.
-            </li>
-            <li>
-              When it's ready, claim from a brand-new wallet on the <a href={href('claim')}>Claim</a> page. Don't
-              connect this wallet there.
-            </li>
-            <li>
-              Changed your mind? This wallet can take the money back on the <a href={href('refund')}>Refund</a> page,
-              with no fee.
-            </li>
-          </ul>
-          <button type="button" className="btn" onClick={reset}>
-            Make another deposit
-          </button>
-        </section>
-      </div>
-    )
-  }
+  if (locked) return <Locked denom={locked.denom} fp={locked.fp} onAgain={reset} />
+
+  const s1: StepState = address ? 'done' : 'current'
+  const s2: StepState = !address ? 'upcoming' : secret ? 'done' : 'current'
+  const s3: StepState = !secret ? 'upcoming' : continued ? 'done' : 'current'
+  const s4: StepState = continued ? 'current' : 'upcoming'
+  const rowNote = (row: 1 | 2) =>
+    row === 1
+      ? phase === 'approving'
+        ? 'Confirm in your wallet'
+        : phase === 'locking'
+          ? 'Done'
+          : ''
+      : phase === 'locking'
+        ? 'Confirm in your wallet'
+        : ''
 
   return (
     <div className="page-narrow">
@@ -158,25 +193,22 @@ export function Deposit() {
       </header>
 
       <ol className="steps">
-        <Step n={1} title="Connect the wallet you're paying from" state={address ? 'done' : 'current'}>
-          {address ? (
-            <p>
-              Paying from <span className="mono">{shortAddress(address)}</span>. This wallet is public, and that's fine:
-              it's the side you're unlinking from.
-            </p>
-          ) : (
-            <>
-              <p>This is your known wallet. The money leaves from here.</p>
-              <WalletButton />
-            </>
-          )}
+        <Step n={1} title="Connect the wallet you're paying from" state={s1} summary="Wallet connected.">
+          <p>This is your known wallet. The money leaves from here.</p>
+          <WalletButton />
         </Step>
 
-        <Step n={2} title="Choose an amount" state={!address ? 'upcoming' : denom ? 'done' : 'current'}>
-          <div className="size-options" role="radiogroup" aria-label="Amount">
+        <Step
+          n={2}
+          title="Choose an amount"
+          state={s2}
+          summary={denom && `${formatUsdc(denom)} USDC. The claim receives ${formatUsdc(denom - feeFor(cfg, denom))} USDC.`}
+        >
+          <p>Every note of a size looks the same, so the amount is fixed.</p>
+          <div className="size-options" role="radiogroup" aria-label="Note size">
             {cfg.denominations.map((d) => {
-              const overLimit = remaining !== null && d > remaining
-              const classes = ['size-option', denom === d && 'is-selected', overLimit && 'is-disabled']
+              const over = !fits(d)
+              const classes = ['size-option', denom === d && 'is-selected', over && 'is-disabled']
               return (
                 <label key={d.toString()} className={classes.filter(Boolean).join(' ')}>
                   <input
@@ -184,49 +216,40 @@ export function Deposit() {
                     name="denom"
                     value={d.toString()}
                     checked={denom === d}
-                    disabled={overLimit || !!secret || busy}
-                    onChange={() => setDenom(d)}
+                    disabled={over}
+                    onChange={() => setPicked(d)}
                   />
                   <span className="size-amount">
                     {formatUsdc(d)} <small>USDC</small>
                   </span>
                   <span className="size-detail">
-                    {overLimit ? 'Over your pilot limit' : `The claim receives ${formatUsdc(d - feeFor(cfg, d))} USDC`}
+                    {over && remaining !== null
+                      ? `More than the ${formatUsdc(remaining)} USDC left in your pilot limit`
+                      : `The claim receives ${formatUsdc(d - feeFor(cfg, d))} USDC`}
                   </span>
                 </label>
               )
             })}
           </div>
-          {remaining !== null && (
-            <p className="field-help">
-              During the invite-only pilot, each wallet can lock up to {formatUsdc(cfg.maxLockPerWallet)} USDC in total.
-              You have {formatUsdc(remaining)} USDC left.
-            </p>
-          )}
-          {secret && (
-            <button type="button" className="btn btn-quiet btn-sm" onClick={reset} disabled={busy}>
-              Change amount and start over
+          <p className="field-help">
+            {remaining !== null && `You can deposit ${formatUsdc(remaining)} more USDC during the invite-only pilot. `}
+            The size can't be changed once your secret exists.
+          </p>
+          {denom ? (
+            <button type="button" className="btn btn-primary" onClick={() => setSecret(makeSecret())}>
+              Create my secret
             </button>
+          ) : (
+            <p className="field-error">This wallet has reached its limit for the invite-only pilot.</p>
           )}
         </Step>
 
-        <Step n={3} title="Save your secret" state={!denom ? 'upcoming' : saved ? 'done' : 'current'}>
-          {denom && !secret && (
-            <>
-              <p>Your browser makes a random secret. Only its fingerprint is sent, never the secret itself.</p>
-              <button type="button" className="btn btn-primary" onClick={() => setSecret(makeSecret())}>
-                Create my secret
-              </button>
-            </>
-          )}
-          {denom && secret && (
+        <Step n={3} title="Save your secret" state={s3} summary="Secret saved. It won't be shown again.">
+          {secret && denom && (
             <>
               <div className="callout callout-warn">
                 <WarningIcon size={18} aria-hidden="true" />
-                <p>
-                  This is shown once. Anyone with it can claim the money. If you lose it, only this wallet can take the
-                  money back.
-                </p>
+                <p>This is shown once. Anyone with it can claim the money, so save it before you go on.</p>
               </div>
               <SecretTicket secret={secret} amount={denom} />
               <div className="actions">
@@ -248,31 +271,56 @@ export function Deposit() {
                   value="saved"
                   checked={confirmed}
                   disabled={!hasSaved}
+                  aria-describedby={hasSaved ? undefined : 'dep-check-help'}
                   onChange={(e) => setConfirmed(e.target.checked)}
                 />
-                <span>I saved my secret somewhere safe and private.</span>
+                <span>I saved my secret somewhere only I can reach</span>
               </label>
-              {!hasSaved && <p className="field-help">Download or copy the secret first.</p>}
+              {!hasSaved && (
+                <p id="dep-check-help" className="field-help">
+                  Download or copy the secret first.
+                </p>
+              )}
+              <div className="submit-row">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={!confirmed}
+                  aria-describedby={confirmed ? undefined : 'dep-continue-why'}
+                  onClick={() => setContinued(true)}
+                >
+                  Continue
+                </button>
+                {!confirmed && (
+                  <p id="dep-continue-why" className="field-help">
+                    Tick the box once your secret is saved.
+                  </p>
+                )}
+              </div>
             </>
           )}
         </Step>
 
-        <Step n={4} title="Deposit and lock" state={saved ? 'current' : 'upcoming'}>
+        <Step n={4} title="Deposit and lock" state={s4}>
           {denom && (
             <>
-              <ul className="progress">
-                <li className={phase === 'depositing' ? 'is-active' : phase === 'locking' ? 'is-done' : ''}>
-                  Send {formatUsdc(denom)} USDC from your wallet
+              <p>Two transactions in your wallet. Keep this page open until both finish.</p>
+              <ul className="progress" aria-live="polite">
+                <li className={phase === 'approving' ? 'is-active' : phase === 'locking' ? 'is-done' : ''}>
+                  <span>Approve {formatUsdc(denom)} USDC</span>
+                  <span className="progress-note">{rowNote(1)}</span>
                 </li>
-                <li className={phase === 'locking' ? 'is-active' : ''}>Lock it under your secret's fingerprint</li>
+                <li className={phase === 'locking' ? 'is-active' : ''}>
+                  <span>Deposit and lock the note</span>
+                  <span className="progress-note">{rowNote(2)}</span>
+                </li>
               </ul>
-              <p className="field-help">
-                In the real app, your wallet asks you to approve USDC and then confirm the deposit. The demo skips those
-                prompts.
-              </p>
-              <button type="button" className="btn btn-primary" onClick={depositAndLock} disabled={busy}>
-                {phase === 'depositing' ? 'Depositing…' : phase === 'locking' ? 'Locking…' : `Deposit and lock ${formatUsdc(denom)} USDC`}
-              </button>
+              {!busy && (
+                <button type="button" className="btn btn-primary" onClick={depositAndLock}>
+                  <LockSimpleIcon size={16} aria-hidden="true" />
+                  Deposit and lock {formatUsdc(denom)} USDC
+                </button>
+              )}
               {error && (
                 <p className="field-error" role="alert">
                   {error}

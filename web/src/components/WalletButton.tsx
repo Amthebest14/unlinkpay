@@ -10,7 +10,7 @@ function connectorLabel(c: Connector): string {
 }
 
 function connectErrorText(error: Error): string {
-  if (error.name === 'ProviderNotFoundError') return 'No browser wallet found. Install one, or use the demo wallet.'
+  if (error.name === 'ProviderNotFoundError') return 'No browser wallet was found. Use the demo wallet instead.'
   if (error.name === 'UserRejectedRequestError') return 'The wallet request was cancelled.'
   return 'Could not connect. Try again.'
 }

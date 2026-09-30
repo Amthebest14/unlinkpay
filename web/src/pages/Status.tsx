@@ -10,7 +10,17 @@ import { VelaError } from '../vela/types'
 
 export const BAD_SECRET =
   "That doesn't look like an UnlinkPay secret. It starts with unlinkpay: followed by 64 letters and numbers."
-export const NO_MATCH = 'No note matches this secret. Check that you pasted all of it.'
+export const NO_MATCH = 'No note matches this secret. Check that you copied all of it.'
+
+export function SkeletonCard({ label }: { label: string }) {
+  return (
+    <div className="panel skeleton-lines" aria-busy="true" aria-label={label}>
+      <span />
+      <span />
+      <span />
+    </div>
+  )
+}
 
 export function Status() {
   const now = useVelaNow()
@@ -60,14 +70,14 @@ export function Status() {
         </button>
       </form>
 
-      {status.isLoading && <div className="panel skeleton-card" aria-busy="true" aria-label="Loading status" />}
+      {status.isLoading && <SkeletonCard label="Checking your note" />}
       {status.error && !notFound && <p className="field-error">Couldn't load the status. Try again.</p>}
       {status.data && (
         <>
           <NoteStatusCard status={status.data} now={now} />
           {effectiveState(status.data, now) === 'ready' && (
             <p className="next-link">
-              When you're ready, go to <a href={href('claim')}>Claim</a> and paste the secret with a fresh wallet address.
+              When you're ready, <a href={href('claim')}>go to Claim</a>.
             </p>
           )}
         </>

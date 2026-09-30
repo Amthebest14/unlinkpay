@@ -1,14 +1,20 @@
 import { useState } from 'react'
-import { formatDuration, formatWhen } from '../lib/format'
+import { dayWord, formatDuration } from '../lib/format'
 import { formatUsdc } from '../lib/money'
 import type { NoteState, NoteStatus } from '../vela/types'
 
-const STATE_LABEL: Record<NoteState, string> = {
+export const STATE_LABEL: Record<NoteState, string> = {
   waiting: 'Waiting',
   ready: 'Ready to claim',
   claimed: 'Claimed',
   refunded: 'Refunded',
   'refund-only': 'Refund only',
+}
+
+const STATE_TEXT: Partial<Record<NoteState, string>> = {
+  claimed: "This note has been claimed. Its secret can't be used again.",
+  refunded: 'This note was refunded to the wallet it came from. Its secret no longer works.',
+  'refund-only': "This deposit didn't pass the sanctions check, so it can only be refunded to the wallet it came from.",
 }
 
 // Time moves on after the status was fetched, so readiness is re-checked here.
@@ -27,17 +33,24 @@ function CrowdTicks({ have, need }: { have: number; need: number }) {
   )
 }
 
+// A random moment 1 to 48 hours ahead, rounded to 5 minutes, so claims don't cluster at the unlock time.
+function randomClaimTime(now: number): number {
+  const r = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32
+  return Math.round((now + 3600 + r * 47 * 3600) / 300) * 300
+}
+
 function SuggestedTime({ now }: { now: number }) {
-  // A random moment 1 to 48 hours from now, picked once per visit.
-  const [at] = useState(() => {
-    const r = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32
-    return now + 3600 + Math.floor(r * 47 * 3600)
-  })
+  const [at, setAt] = useState(() => randomClaimTime(now))
   return (
-    <p className="status-tip">
-      For better privacy, don't claim the moment it unlocks. A random time such as <strong>{formatWhen(at)}</strong> is
-      harder to link to your deposit.
-    </p>
+    <div className="status-tip">
+      <p>
+        For more privacy, don't claim the moment it's ready. Try around <strong>{dayWord(at, now)}</strong>, so claims
+        don't cluster at the unlock time.
+      </p>
+      <button type="button" className="btn btn-sm" onClick={() => setAt(randomClaimTime(now))}>
+        Suggest another time
+      </button>
+    </div>
   )
 }
 
@@ -45,11 +58,12 @@ export function NoteStatusCard({ status, now }: { status: NoteStatus; now: numbe
   const state = effectiveState(status, now)
   const waitLeft = status.unlocksAt - now
   const open = state === 'waiting' || state === 'ready'
+  const text = STATE_TEXT[state]
 
   return (
     <section className="panel status-card" aria-live="polite">
       <div className="status-head">
-        <p className="status-amount">{formatUsdc(status.denom)} USDC note</p>
+        <p className="status-amount">{formatUsdc(status.denom)} USDC</p>
         <span className={`badge badge-${state}`}>{STATE_LABEL[state]}</span>
       </div>
 
@@ -60,33 +74,25 @@ export function NoteStatusCard({ status, now }: { status: NoteStatus; now: numbe
             <dd>
               <CrowdTicks have={Math.min(status.crowd, status.need)} need={status.need} />
               <span>
-                {status.crowd} of {status.need} later deposits
+                {Math.min(status.crowd, status.need)} of {status.need} later deposits
               </span>
             </dd>
           </div>
           <div>
             <dt>Wait</dt>
             <dd>
-              {waitLeft > 0 ? (
-                <span>
-                  {formatDuration(waitLeft)} left, ends {formatWhen(status.unlocksAt)}
-                </span>
-              ) : (
-                <span>24-hour wait is over</span>
-              )}
+              <span>
+                {waitLeft > 0
+                  ? `${formatDuration(waitLeft)} left, ends ${dayWord(status.unlocksAt, now)}`
+                  : '24-hour wait is over'}
+              </span>
             </dd>
           </div>
         </dl>
       )}
 
       {state === 'ready' && <SuggestedTime now={now} />}
-      {state === 'claimed' && <p className="status-note">This note was already claimed.</p>}
-      {state === 'refunded' && <p className="status-note">This note was refunded to the wallet it came from.</p>}
-      {state === 'refund-only' && (
-        <p className="status-note">
-          The depositing wallet was flagged by the sanctions check. This note can only be refunded to it.
-        </p>
-      )}
+      {text && <p className="status-note">{text}</p>}
     </section>
   )
 }

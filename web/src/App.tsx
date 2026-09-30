@@ -1,4 +1,5 @@
 import { DemoPanel } from './components/DemoPanel'
+import { LogoMark } from './components/LogoMark'
 import { WalletButton } from './components/WalletButton'
 import { Claim } from './pages/Claim'
 import { Deposit } from './pages/Deposit'
@@ -40,6 +41,7 @@ export function App() {
       <header className="topbar">
         <div className="topbar-inner">
           <a className="wordmark" href={href('home')}>
+            <LogoMark height={18} />
             UnlinkPay
           </a>
           <nav className="nav" aria-label="Main">
